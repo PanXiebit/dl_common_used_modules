@@ -2,6 +2,9 @@
 [pytorch RNN 变长输入 padding](https://zhuanlan.zhihu.com/p/28472545)
 
 """
+import torch
+import torch.nn as nn
+import numpy as np
 
 
 class LSTM_V(nn.Module):
@@ -46,10 +49,17 @@ class LSTM_V(nn.Module):
         :return:
         """
         """sort"""
-        x_sort_idx = np.argsort(-x_len)
-        x_unsort_idx = torch.LongTensor(np.argsort(x_sort_idx))
-        x_len = x_len[x_sort_idx]
-        x = x[torch.LongTensor(x_sort_idx)]
+        # x_sort_idx = np.argsort(-x_len)  #
+        # x_unsort_idx = torch.LongTensor(np.argsort(x_sort_idx))
+        # x_len = x_len[x_sort_idx]
+        # x = x[torch.LongTensor(x_sort_idx)]
+
+        x_len, x_sort_idx = x_len.sort(0, descending=True)  # 降序
+        x = x.index_select(0, x_sort_idx)
+
+        """unsort index"""
+        _, x_unsort_idx = x_sort_idx.sort(0, descending=False)
+
         """pack"""
         x_emb_p = torch.nn.utils.rnn.pack_padded_sequence(x, x_len, batch_first=self.batch_first)
         """process using RNN"""
@@ -72,3 +82,17 @@ class LSTM_V(nn.Module):
             ct = torch.transpose(ct, 0, 1)
 
             return out, (ht, ct)
+
+if __name__ == "__main__":
+    x = torch.randn(5, 10, 32)
+    x_len = torch.LongTensor([6,3,2,4,6])
+    model = LSTM_V(32, 64, bidirectional=True)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        x = x.to(device)
+        x_len = x_len.to(device)
+        model = model.to(device)
+    out, _ = model(x, x_len)
+    print(out.shape)
+
+
